@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fotos</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --fg: #1d1d1b; --muted: #6b6b66; --card: #fff; --line: #e2e2dd;
+    --accent: #2d6cdf; --ok: #1f8a4c; --warn: #b26a00; --warn-bg: #fff4e0; --err: #c0392b; --star: #f5b301;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --fg: #ececea; --muted: #9a9a94; --card: #222220; --line: #33332f;
+            --accent: #6d9cff; --ok: #4cc27f; --warn: #f0b04a; --warn-bg: #3a2c12; --err: #ff6b5e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+           padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; }
+  header a { color: inherit; text-decoration: none; }
+  nav { display: flex; gap: 4px; flex: 1; }
+  nav a { padding: 6px 12px; border-radius: 8px; color: var(--muted); }
+  @media (max-width: 600px) { nav { order: 3; flex-basis: 100%; } header .btn { margin-left: auto; } }
+  nav a.on { background: var(--card); color: var(--fg); font-weight: 600; border: 1px solid var(--line); }
+  button, .btn { font: inherit; border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+                 background: var(--accent); color: #fff; text-decoration: none; display: inline-block; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  button.danger { background: transparent; color: var(--err); border: 1px solid var(--err); }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=text] { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+                     background: var(--card); color: var(--fg); min-width: 0; }
+  main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+  h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin: 24px 0 10px; }
+  h2::first-letter { text-transform: uppercase; }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; }
+  .toolbar h2 { margin: 0; flex: 1; min-width: 200px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+          color: inherit; text-decoration: none; }
+  .card .cover { aspect-ratio: 1; background: var(--line) center/cover no-repeat; display: flex;
+                 align-items: center; justify-content: center; color: var(--muted); font-size: 34px; }
+  .card .info { padding: 8px 10px; font-size: 13px; }
+  .card .info b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 4px; }
+  .tile { position: relative; aspect-ratio: 1; background: var(--line) center/cover no-repeat; border-radius: 4px;
+          cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+  .tile .play { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; transform: translate(-50%, -50%);
+                border-radius: 50%; background: rgba(0,0,0,.35); border: 2px solid rgba(255,255,255,.75);
+                display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .tile .play svg { width: 16px; height: 16px; margin-left: 3px; fill: rgba(255,255,255,.85); }
+  .tile .fav { position: absolute; right: 5px; bottom: 3px; color: var(--star); font-size: 18px;
+               text-shadow: 0 0 3px rgba(0,0,0,.6); }
+  .tile .check { position: absolute; left: 6px; top: 6px; width: 24px; height: 24px; border-radius: 50%;
+                 border: 2px solid #fff; background: rgba(0,0,0,.25); display: none; color: #fff;
+                 font-size: 14px; align-items: center; justify-content: center; }
+  .selecting .tile .check { display: flex; }
+  .tile.sel { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .tile.sel .check { background: var(--accent); border-color: var(--accent); }
+  .tile .left { position: absolute; left: 5px; bottom: 4px; padding: 1px 6px; border-radius: 6px;
+                background: rgba(0,0,0,.6); color: #fff; font-size: 11px; }
+  .note { color: var(--muted); font-size: 13px; margin: -4px 0 12px; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
+  #selbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 9; display: none;
+            flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 10px 12px;
+            background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,.2); width: max-content; max-width: calc(100vw - 32px); }
+  #selbar b { padding: 0 6px; }
+  #drop { position: fixed; inset: 0; z-index: 20; background: rgba(45,108,223,.15); border: 3px dashed var(--accent);
+          display: none; align-items: center; justify-content: center; font-size: 22px; }
+  #panel { position: fixed; right: 16px; bottom: 16px; z-index: 10; width: min(420px, calc(100vw - 32px));
+           max-height: 60vh; display: none; flex-direction: column; background: var(--card);
+           border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+  #panel .head { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); gap: 8px; }
+  #panel .head b { flex: 1; }
+  #panel ul { list-style: none; margin: 0; padding: 0; overflow: auto; }
+  #panel li { padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #panel li .n { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-ok { color: var(--ok); } .s-dup { color: var(--warn); } .s-err { color: var(--err); } .s-wait { color: var(--muted); }
+  #alert { display: none; margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--warn-bg);
+           color: var(--warn); border: 1px solid var(--warn); font-weight: 600; }
+  #toast { position: fixed; left: 50%; top: 70px; transform: translateX(-50%); z-index: 50; display: none;
+           background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; }
+  #viewer { position: fixed; inset: 0; z-index: 30; background: #000; display: none; flex-direction: column; color: #eee; }
+  #viewer .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; }
+  #viewer .bar span { flex: 1; min-width: 120px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #viewer .bar button, #viewer .bar .btn { background: rgba(255,255,255,.12); color: #eee; }
+  #viewer #v-fav.on { color: var(--star); }
+  #viewer .stage { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
+  #viewer img, #viewer video { max-width: 100vw; max-height: calc(100vh - 60px); object-fit: contain; image-orientation: from-image; }
+  #viewer .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 28px; padding: 14px 16px;
+                 background: rgba(255,255,255,.08); }
+  #viewer .prev { left: 8px; } #viewer .next { right: 8px; }
+  #picker { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.5); display: none;
+            align-items: center; justify-content: center; padding: 16px; }
+  #picker .box { background: var(--card); color: var(--fg); border-radius: 12px; width: min(380px, 100%);
+                 max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; }
+  #picker .box > b { padding: 14px 16px 6px; }
+  #picker ul { list-style: none; margin: 0; padding: 0 8px; overflow: auto; }
+  #picker li button { width: 100%; text-align: left; background: transparent; color: var(--fg); display: flex; gap: 10px; }
+  #picker li button:hover { background: var(--bg); }
+  #picker li .mark { width: 18px; color: var(--accent); font-weight: 700; }
+  #picker li .cnt { margin-left: auto; color: var(--muted); font-size: 13px; }
+  #picker form { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+  #picker form input { flex: 1; }
+  #picker .foot { padding: 0 16px 14px; text-align: right; }
+</style>
+</head>
+<body>
+<header>
+  <h1><a href="#/">Fotos</a></h1>
+  <nav>
+    <a href="#/" data-tab="dias">Recentes</a>
+    <a href="#/favoritos" data-tab="favoritos">Favoritos</a>
+    <a href="#/albuns" data-tab="albuns">Álbuns</a>
+    <a href="#/lixeira" data-tab="lixeira">Lixeira</a>
+  </nav>
+  <label class="btn" for="pick">⬆ Enviar</label>
+  <!-- As extensões vão listadas porque só "image/*,video/*" faz alguns sistemas esconderem
+       vídeos (e HEIC, RAW) na janela de escolher arquivos. Mesma lista do media.go. -->
+  <input id="pick" type="file" multiple hidden
+    accept="image/*,video/*,.jpg,.jpeg,.jpe,.jfif,.png,.gif,.webp,.heic,.heif,.avif,.bmp,.tif,.tiff,.dng,.cr2,.cr3,.nef,.arw,.orf,.rw2,.raf,.mov,.mp4,.m4v,.3gp,.3g2,.webm,.mkv,.avi,.mts,.m2ts,.wmv,.mpg,.mpeg,.flv,.ogv">
+</header>
+<main>
+  <div id="alert"></div>
+  <div id="content"></div>
+</main>
+
+<div id="selbar">
+  <b id="sel-count">0 selecionadas</b>
+  <button id="sel-fav">★ Favoritar</button>
+  <button id="sel-album">Adicionar a álbum</button>
+  <button id="sel-remove" class="ghost">Remover do álbum</button>
+  <button id="sel-trash" class="danger">Apagar</button>
+  <button id="sel-restore">Restaurar</button>
+  <button id="sel-purge" class="danger">Excluir de vez</button>
+  <button id="sel-cancel" class="ghost">Cancelar</button>
+</div>
+
+<div id="drop">Solte fotos e vídeos aqui</div>
+<div id="toast"></div>
+
+<div id="panel">
+  <div class="head"><b id="panel-title">Enviando</b><button class="ghost" id="panel-close">Fechar</button></div>
+  <ul id="panel-list"></ul>
+</div>
+
+<div id="viewer">
+  <div class="bar">
+    <span id="v-name"></span>
+    <button id="v-fav" title="Favoritar">☆</button>
+    <button id="v-album">Álbuns</button>
+    <a class="btn" id="v-open" target="_blank">Original</a>
+    <a class="btn" id="v-download">Download</a>
+    <button id="v-del">Apagar</button>
+    <button id="v-restore">Restaurar</button>
+    <button id="v-purge">Excluir de vez</button>
+    <button id="v-close">Fechar</button>
+  </div>
+  <div class="stage" id="v-stage"></div>
+  <button class="nav prev" id="v-prev">‹</button>
+  <button class="nav next" id="v-next">›</button>
+</div>
+
+<div id="picker">
+  <div class="box">
+    <b id="pk-title">Adicionar a álbum</b>
+    <ul id="pk-list"></ul>
+    <form id="pk-form"><input type="text" id="pk-name" placeholder="Novo álbum" maxlength="100"><button>Criar</button></form>
+    <div class="foot"><button class="ghost" id="pk-close" type="button">Fechar</button></div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const content = $('#content');
+
+function parseDay(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+const fmtLong = (day) => parseDay(day).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const fmtShort = (day) => parseDay(day).toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric' });
+const fmtMonth = (day) => parseDay(day).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+const fmtDate = (day) => parseDay(day).toLocaleDateString('pt-BR');
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ext = (name) => (name.split('.').pop() || '').toUpperCase();
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// mediaCount escreve "2 fotos e 1 vídeo", "3 fotos", "1 vídeo"...
+function mediaCount(total, videos) {
+  const ph = total - videos;
+  if (!videos) return plural(ph, 'foto', 'fotos');
+  if (!ph) return plural(videos, 'vídeo', 'vídeos');
+  return `${plural(ph, 'foto', 'fotos')} e ${plural(videos, 'vídeo', 'vídeos')}`;
+}
+// O hash na URL garante que o navegador nunca mostre do cache um arquivo de outra foto.
+const thumbUrl = (id, hash) => `/thumb/${id}?v=${hash.slice(0, 12)}`;
+const photoUrl = (p) => `/photo/${p.id}?v=${p.hash.slice(0, 12)}`;
+const countOf = (list) => mediaCount(list.length, list.filter((p) => p.isVideo).length);
+const countIds = (ids) => countOf(photos.filter((p) => ids.includes(p.id)));
+
+async function api(method, url, body) {
+  const r = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error((await r.text()).trim() || r.statusText);
+  return r.status === 204 ? null : r.json();
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.style.display = 'none'), 2500);
+}
+
+// ---------- Navegação ----------
+// photos: fotos da tela atual (dia, favoritos, álbum ou lixeira). albumId: álbum aberto, se houver.
+// inTrash: a tela atual é a lixeira, onde as ações são restaurar e excluir de vez.
+let photos = [], albumId = null, inTrash = false, retentionDays = 30;
+
+async function render() {
+  stopSelecting();
+  const h = location.hash;
+  let m, tab = 'dias';
+  inTrash = false;
+  try {
+    if ((m = h.match(/^#\/dia\/(\d{4}-\d{2}-\d{2})$/))) await renderDay(m[1]);
+    else if (h === '#/favoritos') { tab = 'favoritos'; await renderFavorites(); }
+    else if (h === '#/albuns') { tab = 'albuns'; await renderAlbums(); }
+    else if ((m = h.match(/^#\/album\/(\d+)$/))) { tab = 'albuns'; await renderAlbum(Number(m[1])); }
+    else if (h === '#/lixeira') { tab = 'lixeira'; await renderTrash(); }
+    else await renderDays();
+  } catch (e) {
+    content.innerHTML = `<p class="empty">Erro: ${esc(e.message)}</p>`;
+  }
+  document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
+}
+
+async function renderDays() {
+  albumId = null;
+  const days = await api('GET', '/api/days');
+  if (!days.length) {
+    content.innerHTML = '<p class="empty">Nenhuma foto ainda. Clique em "Enviar" ou arraste fotos e vídeos para cá.</p>';
+    return;
+  }
+  let html = '', month = '';
+  for (const d of days) {
+    const mo = d.day.slice(0, 7);
+    if (mo !== month) {
+      if (month) html += '</div>';
+      html += `<h2>${fmtMonth(d.day)}</h2><div class="cards">`;
+      month = mo;
+    }
+    html += `<a class="card" href="#/dia/${d.day}">
+      <div class="cover" style="background-image:url(${thumbUrl(d.coverId, d.coverHash)})"></div>
+      <div class="info"><b>${fmtShort(d.day)}</b>${mediaCount(d.count, d.videos)}</div></a>`;
+  }
+  content.innerHTML = html + '</div>';
+}
+
+async function renderDay(day) {
+  albumId = null;
+  photos = await api('GET', '/api/days/' + day);
+  renderGrid(`${fmtLong(day)} · ${countOf(photos)}`, '', 'Nada neste dia.');
+}
+
+async function renderFavorites() {
+  albumId = null;
+  photos = await api('GET', '/api/favorites');
+  renderGrid(`Favoritos · ${countOf(photos)}`, '',
+    'Nenhuma favorita ainda. Abra uma foto e toque na ☆ para favoritar.');
+}
+
+async function renderAlbums() {
+  albumId = null;
+  const albums = await api('GET', '/api/albums');
+  let html = `<div class="toolbar"><h2>Álbuns</h2>
+    <form id="new-album" style="display:flex;gap:8px"><input type="text" id="new-album-name" placeholder="Nome do novo álbum" maxlength="100">
+    <button>Criar álbum</button></form></div>`;
+  if (!albums.length) html += '<p class="empty">Nenhum álbum ainda. Crie um acima e adicione fotos pelo botão "Selecionar" ou pelo visualizador.</p>';
+  html += '<div class="cards">';
+  for (const a of albums) {
+    const cover = a.coverId ? `style="background-image:url(${thumbUrl(a.coverId, a.coverHash)})">` : '>▣';
+    html += `<a class="card" href="#/album/${a.id}"><div class="cover" ${cover}</div>
+      <div class="info"><b>${esc(a.name)}</b>${mediaCount(a.count, a.videos)}</div></a>`;
+  }
+  content.innerHTML = html + '</div>';
+  $('#new-album').onsubmit = async (e) => {
+    e.preventDefault();
+    const name = $('#new-album-name').value.trim();
+    if (!name) return;
+    try {
+      const a = await api('POST', '/api/albums', { name });
+      location.hash = '#/album/' + a.id;
+    } catch (err) { toast('Erro: ' + err.message); }
+  };
+}
+
+async function renderAlbum(id) {
+  const data = await api('GET', '/api/albums/' + id);
+  albumId = id;
+  photos = data.photos;
+  renderGrid(`${data.album.name} · ${countOf(photos)}`,
+    `<button class="ghost" id="al-rename">Renomear</button><button class="danger" id="al-delete">Apagar álbum</button>`,
+    'Álbum vazio. Vá em Dias ou Favoritos, toque em "Selecionar", escolha as fotos e use "Adicionar a álbum".');
+  $('#al-rename').onclick = async () => {
+    const name = prompt('Novo nome do álbum:', data.album.name);
+    if (!name || !name.trim()) return;
+    try { await api('PATCH', '/api/albums/' + id, { name: name.trim() }); render(); }
+    catch (err) { toast('Erro: ' + err.message); }
+  };
+  $('#al-delete').onclick = async () => {
+    if (!confirm(`Apagar o álbum "${data.album.name}"? As fotos continuam no acervo.`)) return;
+    try { await api('DELETE', '/api/albums/' + id); location.hash = '#/albuns'; }
+    catch (err) { toast('Erro: ' + err.message); }
+  };
+}
+
+async function renderTrash() {
+  albumId = null;
+  const data = await api('GET', '/api/trash');
+  inTrash = true;
+  retentionDays = data.retentionDays;
+  photos = data.photos;
+  renderGrid(`Lixeira · ${countOf(photos)}`,
+    photos.length ? '<button class="danger" id="trash-empty">Esvaziar lixeira</button>' : '',
+    'A lixeira está vazia.');
+  $('.toolbar').insertAdjacentHTML('afterend',
+    `<p class="note">As fotos apagadas ficam aqui por ${retentionDays} dias e depois são excluídas de vez do servidor.</p>`);
+  if (photos.length) $('#trash-empty').onclick = async () => {
+    if (!confirm(`Excluir de vez ${countOf(photos)} da lixeira? Elas serão apagadas do servidor e não dá para recuperar.`)) return;
+    try {
+      const res = await api('DELETE', '/api/trash');
+      toast(`Lixeira esvaziada: ${plural(res.purged, 'item excluído', 'itens excluídos')} de vez`);
+      render();
+    } catch (err) { toast('Erro: ' + err.message); }
+  };
+}
+
+// daysLeft: quantos dias faltam para a foto ser excluída de vez da lixeira.
+function daysLeft(p) {
+  const ms = new Date(p.deletedAt).getTime() + retentionDays * 864e5 - Date.now();
+  return Math.max(0, Math.ceil(ms / 864e5));
+}
+
+function tileHTML(p, i) {
+  const bg = p.hasThumb ? ` style="background-image:url(${thumbUrl(p.id, p.hash)})"` : '';
+  const label = p.hasThumb || p.isVideo ? '' : esc(ext(p.name));
+  const play = p.isVideo ? '<span class="play"><svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></span>' : '';
+  return `<div class="tile" data-i="${i}"${bg}>${label}${play}
+    <span class="check">✓</span>${p.favorite && !inTrash ? '<span class="fav">★</span>' : ''}
+    ${inTrash ? `<span class="left">${plural(daysLeft(p), 'dia', 'dias')}</span>` : ''}</div>`;
+}
+
+function renderGrid(title, extraButtons, emptyMsg) {
+  let html = `<div class="toolbar"><h2>${esc(title)}</h2>${extraButtons}
+    ${photos.length ? '<button class="ghost" id="sel-start">Selecionar</button>' : ''}</div>`;
+  if (!photos.length) html += `<p class="empty">${esc(emptyMsg)}</p>`;
+  html += '<div class="grid" id="grid">' + photos.map(tileHTML).join('') + '</div>';
+  content.innerHTML = html;
+  if (photos.length) $('#sel-start').onclick = startSelecting;
+}
+
+function refreshTile(i) {
+  const old = content.querySelector(`.tile[data-i="${i}"]`);
+  if (!old) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = tileHTML(photos[i], i);
+  if (old.classList.contains('sel')) tmp.firstElementChild.classList.add('sel');
+  old.replaceWith(tmp.firstElementChild);
+}
+
+content.addEventListener('click', (e) => {
+  const t = e.target.closest('.tile');
+  if (!t) return;
+  const i = Number(t.dataset.i);
+  if (selecting) toggleSelected(i, t);
+  else openViewer(i);
+});
+
+// ---------- Seleção múltipla ----------
+let selecting = false;
+const selected = new Set();
+
+function startSelecting() {
+  selecting = true;
+  selected.clear();
+  $('#grid').classList.add('selecting');
+  const show = (sel, on) => ($(sel).style.display = on ? '' : 'none');
+  show('#sel-fav', !inTrash);
+  show('#sel-album', !inTrash);
+  show('#sel-remove', !!albumId);
+  show('#sel-trash', !inTrash);
+  show('#sel-restore', inTrash);
+  show('#sel-purge', inTrash);
+  $('#selbar').style.display = 'flex';
+  updateSelbar();
+}
+function stopSelecting() {
+  selecting = false;
+  selected.clear();
+  $('#selbar').style.display = 'none';
+  const g = $('#grid');
+  if (g) { g.classList.remove('selecting'); g.querySelectorAll('.sel').forEach((t) => t.classList.remove('sel')); }
+}
+function toggleSelected(i, tile) {
+  if (selected.has(i)) selected.delete(i); else selected.add(i);
+  tile.classList.toggle('sel', selected.has(i));
+  updateSelbar();
+}
+function updateSelbar() {
+  $('#sel-count').textContent = plural(selected.size, 'selecionada', 'selecionadas');
+  ['#sel-fav', '#sel-album', '#sel-remove', '#sel-trash', '#sel-restore', '#sel-purge'].forEach((s) => ($(s).disabled = selected.size === 0));
+}
+const selectedIds = () => [...selected].map((i) => photos[i].id);
+
+$('#sel-cancel').onclick = stopSelecting;
+$('#sel-fav').onclick = async () => {
+  const idx = [...selected];
+  try {
+    await Promise.all(idx.map((i) => api('PUT', `/api/photos/${photos[i].id}/favorite`, { favorite: true })));
+    idx.forEach((i) => { photos[i].favorite = true; refreshTile(i); });
+    toast(`Favoritados: ${countOf(idx.map((i) => photos[i]))}`);
+    stopSelecting();
+  } catch (err) { toast('Erro: ' + err.message); }
+};
+$('#sel-album').onclick = () => openPicker(selectedIds(), null);
+$('#sel-remove').onclick = async () => {
+  const ids = selectedIds();
+  if (!confirm(`Remover ${countIds(ids)} deste álbum? Elas continuam no acervo.`)) return;
+  try {
+    await api('DELETE', `/api/albums/${albumId}/photos`, { photoIds: ids });
+    render();
+  } catch (err) { toast('Erro: ' + err.message); }
+};
+
+$('#sel-trash').onclick = () => trashPhotos(selectedIds());
+$('#sel-restore').onclick = () => restorePhotos(selectedIds());
+$('#sel-purge').onclick = () => purgePhotos(selectedIds());
+
+// ---------- Lixeira ----------
+async function trashPhotos(ids) {
+  if (!confirm(`Mover ${countIds(ids)} para a lixeira? Elas somem de Recentes, Favoritos e álbuns e são excluídas de vez em ${retentionDays} dias.`)) return false;
+  try {
+    await api('POST', '/api/trash', { photoIds: ids });
+    toast(`Movidos para a lixeira: ${countIds(ids)}`);
+    render();
+    return true;
+  } catch (err) { toast('Erro: ' + err.message); return false; }
+}
+async function restorePhotos(ids) {
+  try {
+    await api('POST', '/api/trash/restore', { photoIds: ids });
+    toast(`Restaurados: ${countIds(ids)}`);
+    render();
+    return true;
+  } catch (err) { toast('Erro: ' + err.message); return false; }
+}
+async function purgePhotos(ids) {
+  if (!confirm(`Excluir de vez ${countIds(ids)}? Elas serão apagadas do servidor e não dá para recuperar.`)) return false;
+  try {
+    await api('POST', '/api/trash/purge', { photoIds: ids });
+    toast(`Excluídos de vez: ${countIds(ids)}`);
+    render();
+    return true;
+  } catch (err) { toast('Erro: ' + err.message); return false; }
+}
+
+// ---------- Escolher álbum ----------
+// ids: fotos a adicionar. member: Set com os álbuns em que a foto já está (só no visualizador,
+// onde tocar no álbum também tira a foto dele).
+let pkIds = [], pkMember = null;
+
+async function openPicker(ids, member) {
+  pkIds = ids;
+  pkMember = member;
+  $('#pk-title').textContent = member ? 'Álbuns desta foto' : `Adicionar ${countIds(ids)} a um álbum`;
+  $('#pk-name').value = '';
+  await fillPicker();
+  $('#picker').style.display = 'flex';
+}
+async function fillPicker() {
+  const albums = await api('GET', '/api/albums');
+  $('#pk-list').innerHTML = albums.length
+    ? albums.map((a) => `<li><button type="button" data-id="${a.id}" data-name="${esc(a.name)}">
+        <span class="mark">${pkMember && pkMember.has(a.id) ? '✓' : ''}</span>${esc(a.name)}
+        <span class="cnt">${a.count}</span></button></li>`).join('')
+    : '<li class="empty" style="padding:16px">Nenhum álbum. Crie um abaixo.</li>';
+}
+function closePicker() {
+  $('#picker').style.display = 'none';
+}
+async function addToAlbum(id, name) {
+  const res = await api('POST', `/api/albums/${id}/photos`, { photoIds: pkIds });
+  const skipped = pkIds.length - res.added;
+  toast(`${plural(res.added, 'item adicionado', 'itens adicionados')} a "${name}"` + (skipped ? ` (${skipped} já estava${skipped > 1 ? 'm' : ''} lá)` : ''));
+}
+$('#pk-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-id]');
+  if (!b) return;
+  const id = Number(b.dataset.id), name = b.dataset.name;
+  try {
+    if (pkMember) {
+      if (pkMember.has(id)) {
+        await api('DELETE', `/api/albums/${id}/photos`, { photoIds: pkIds });
+        pkMember.delete(id);
+        toast(`Removida de "${name}"`);
+      } else {
+        await addToAlbum(id, name);
+        pkMember.add(id);
+      }
+      await fillPicker();
+      if (albumId === id) needsRender = true;
+    } else {
+      await addToAlbum(id, name);
+      closePicker();
+      stopSelecting();
+    }
+  } catch (err) { toast('Erro: ' + err.message); }
+});
+$('#pk-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $('#pk-name').value.trim();
+  if (!name) return;
+  try {
+    const a = await api('POST', '/api/albums', { name });
+    await addToAlbum(a.id, a.name);
+    $('#pk-name').value = '';
+    if (pkMember) { pkMember.add(a.id); await fillPicker(); }
+    else { closePicker(); stopSelecting(); }
+  } catch (err) { toast('Erro: ' + err.message); }
+};
+$('#pk-close').onclick = closePicker;
+$('#picker').addEventListener('click', (e) => { if (e.target.id === 'picker') closePicker(); });
+
+// ---------- Visualizador ----------
+let vIndex = 0, needsRender = false;
+function openViewer(i) {
+  vIndex = (i + photos.length) % photos.length;
+  const p = photos[vIndex];
+  const src = photoUrl(p);
+  $('#v-stage').innerHTML = p.isVideo
+    ? `<video src="${src}" controls autoplay playsinline></video>`
+    : `<img src="${src}" alt="">`;
+  const video = $('#v-stage video');
+  if (video) video.onerror = () => {
+    $('#v-stage').innerHTML = `<p style="max-width:420px;text-align:center;padding:16px;line-height:1.5">
+      Este navegador não consegue reproduzir o formato deste vídeo (provavelmente HEVC/H.265, padrão do iPhone).
+      O arquivo está intacto: use o botão <b>Download</b> para assistir no aparelho.</p>`;
+  };
+  const when = p.dateSource === 'upload' ? 'data desconhecida' : `${fmtDate(p.day)} ${p.takenAt.slice(11, 16)}`;
+  $('#v-name').textContent = `${p.name} · ${when}`;
+  $('#v-open').href = src;
+  $('#v-download').href = src + '&download=1';
+  for (const id of ['v-fav', 'v-album', 'v-del']) $('#' + id).style.display = inTrash ? 'none' : '';
+  for (const id of ['v-restore', 'v-purge']) $('#' + id).style.display = inTrash ? '' : 'none';
+  if (inTrash) $('#v-name').textContent += ` · na lixeira, excluída de vez em ${plural(daysLeft(p), 'dia', 'dias')}`;
+  else updateFavButton();
+  $('#viewer').style.display = 'flex';
+}
+function updateFavButton() {
+  const fav = photos[vIndex].favorite;
+  const b = $('#v-fav');
+  b.textContent = fav ? '★ Favorita' : '☆ Favoritar';
+  b.classList.toggle('on', fav);
+}
+function closeViewer() {
+  $('#viewer').style.display = 'none';
+  $('#v-stage').innerHTML = '';
+  if (needsRender) { needsRender = false; render(); }
+}
+$('#v-close').onclick = closeViewer;
+$('#v-prev').onclick = () => openViewer(vIndex - 1);
+$('#v-next').onclick = () => openViewer(vIndex + 1);
+$('#v-fav').onclick = async () => {
+  const p = photos[vIndex];
+  try {
+    await api('PUT', `/api/photos/${p.id}/favorite`, { favorite: !p.favorite });
+    p.favorite = !p.favorite;
+    updateFavButton();
+    refreshTile(vIndex);
+    if (location.hash === '#/favoritos') needsRender = true;
+  } catch (err) { toast('Erro: ' + err.message); }
+};
+$('#v-album').onclick = async () => {
+  const p = photos[vIndex];
+  try { openPicker([p.id], new Set(await api('GET', `/api/photos/${p.id}/albums`))); }
+  catch (err) { toast('Erro: ' + err.message); }
+};
+// As funções da lixeira já atualizam a tela; aqui só fecha o visualizador.
+const closeIf = (ok) => { if (ok) { needsRender = false; closeViewer(); } };
+$('#v-del').onclick = async () => closeIf(await trashPhotos([photos[vIndex].id]));
+$('#v-restore').onclick = async () => closeIf(await restorePhotos([photos[vIndex].id]));
+$('#v-purge').onclick = async () => closeIf(await purgePhotos([photos[vIndex].id]));
+document.addEventListener('keydown', (e) => {
+  if ($('#viewer').style.display !== 'flex' || $('#picker').style.display === 'flex') return;
+  if (e.key === 'Escape') closeViewer();
+  if (e.key === 'ArrowLeft') openViewer(vIndex - 1);
+  if (e.key === 'ArrowRight') openViewer(vIndex + 1);
+  if (e.key === 'f' && !inTrash) $('#v-fav').click();
+});
+
+// ---------- Upload ----------
+const queue = [];
+let busy = false, stats = { ok: 0, dup: 0, err: 0 };
+
+// Só fotos e vídeos, pela lista do botão Enviar. Vale também para arrastar e soltar;
+// o servidor confere de novo.
+const mediaExts = new Set($('#pick').accept.split(',').map((t) => t.trim()).filter((t) => t.startsWith('.')));
+const isMedia = (f) => mediaExts.has((f.name.match(/\.[^.]+$/) || [''])[0].toLowerCase());
+
+function enqueue(files) {
+  const list = $('#panel-list');
+  for (const f of files) {
+    const li = document.createElement('li');
+    if (!isMedia(f)) {
+      stats.err++;
+      li.innerHTML = `<span class="n">${esc(f.name)}</span><span class="s-err">Recusado: só fotos e vídeos</span>`;
+      list.appendChild(li);
+      continue;
+    }
+    li.innerHTML = `<span class="n">${esc(f.name)}</span><span class="s-wait">Na fila</span>`;
+    list.appendChild(li);
+    queue.push({ file: f, li });
+  }
+  $('#panel').style.display = 'flex';
+  if (!busy) next();
+}
+
+async function next() {
+  const item = queue.shift();
+  if (!item) {
+    busy = false;
+    $('#panel-title').textContent = `Pronto: ${stats.ok} salvas, ${stats.dup} já existiam, ${stats.err} com erro`;
+    render();
+    return;
+  }
+  busy = true;
+  $('#panel-title').textContent = `Enviando… faltam ${queue.length + 1}`;
+  const status = item.li.lastChild;
+  status.className = 's-wait';
+  status.textContent = 'Enviando…';
+  const fd = new FormData();
+  fd.append('lastModified', String(item.file.lastModified || 0));
+  fd.append('file', item.file);
+  try {
+    const r = await fetch('/api/upload', { method: 'POST', body: fd });
+    const res = await r.json();
+    if (res.status === 'ok') {
+      stats.ok++;
+      status.className = 's-ok';
+      status.textContent = `${res.photo.isVideo ? 'Salvo' : 'Salva'} no dia ${fmtDate(res.photo.day)}`;
+    } else if (res.status === 'duplicate') {
+      stats.dup++;
+      status.className = 's-dup';
+      status.textContent = res.message;
+      showDuplicate(item.file.name, res);
+    } else {
+      throw new Error(res.message);
+    }
+  } catch (e) {
+    stats.err++;
+    status.className = 's-err';
+    status.textContent = 'Erro: ' + e.message;
+  }
+  next();
+}
+
+const dupNames = [];
+function showDuplicate(name, res) {
+  dupNames.push(name);
+  const a = $('#alert');
+  a.innerHTML = dupNames.length === 1
+    ? (res.photo.deletedAt
+      ? `⚠ "${esc(name)}" já existe e está na lixeira. Não foi salva de novo. <a href="#/lixeira">Abrir a lixeira</a>`
+      : `⚠ "${esc(name)}" já existe no acervo (dia ${fmtDate(res.photo.day)}). Não foi salva de novo.
+       <a href="#/dia/${res.photo.day}">Ver</a>`)
+    : `⚠ ${dupNames.length} fotos já existiam no acervo e não foram salvas de novo: ${dupNames.map(esc).join(', ')}`;
+  a.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+$('#pick').onchange = (e) => { enqueue(e.target.files); e.target.value = ''; };
+$('#panel-close').onclick = () => {
+  if (busy) return;
+  $('#panel').style.display = 'none';
+  $('#panel-list').innerHTML = '';
+  $('#alert').style.display = 'none';
+  dupNames.length = 0;
+  stats = { ok: 0, dup: 0, err: 0 };
+};
+
+let dragDepth = 0;
+addEventListener('dragenter', (e) => { e.preventDefault(); dragDepth++; $('#drop').style.display = 'flex'; });
+addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#drop').style.display = 'none'; } });
+addEventListener('dragover', (e) => e.preventDefault());
+addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  $('#drop').style.display = 'none';
+  if (e.dataTransfer.files.length) enqueue(e.dataTransfer.files);
+});
+
+addEventListener('hashchange', render);
+render();
+</script>
+</body>
+</html>
